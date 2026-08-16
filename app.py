@@ -10,17 +10,14 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from fpdf import FPDF
 import os
-import requests
-import datetime  # Added for dynamic dates
+import datetime
+from curl_cffi import requests
 
 # ==========================================
-# Session Setup (Bypass Yahoo Finance 429 Error)
+# Session Setup (Bypass Yahoo Finance 429 TLS Fingerprinting)
 # ==========================================
-# Create a standard session and set a browser User-Agent 
-session = requests.Session()
-session.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-})
+# Impersonate a real Chrome browser to bypass advanced rate limits
+session = requests.Session(impersonate="chrome")
 
 st.set_page_config(page_title="Stock Predictor & Intelligence Report", layout="wide")
 
