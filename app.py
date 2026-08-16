@@ -11,16 +11,16 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from fpdf import FPDF
 import os
 from requests import Session
-from requests_cache import CacheMixin, SQLiteCache
-from requests_ratelimiter import LimiterMixin, MemoryRateLimiter
+from requests_cache import CacheMixin
+from requests_ratelimiter import LimiterMixin
 
-# Setup safe session with rate-limiting & caching to prevent Yahoo Finance 429 RateLimitError
-class CachedSession(CacheMixin, LimiterMixin, Session):
+# Combine caching and rate-limiting into a single session
+class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
     pass
 
-session = CachedSession(
-    cache=SQLiteCache('.cache.sqlite'),
-    limiter=MemoryRateLimiter(per_second=2)
+session = CachedLimiterSession(
+    cache_name='yfinance.cache',
+    per_second=2 # Limits requests to avoid 429 errors from Yahoo Finance
 )
 session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
