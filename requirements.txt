@@ -1,0 +1,12 @@
+streamlit
+yfinance
+numpy
+pandas
+matplotlib
+plotly
+scikit-learn
+tensorflow
+vaderSentiment
+fpdf
+requests-cache
+requests-ratelimiter
