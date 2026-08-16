@@ -34,7 +34,7 @@ ticker = st.sidebar.text_input("Stock Ticker", value="AAPL").upper()
 today = datetime.date.today()
 five_years_ago = today - datetime.timedelta(days=5 * 365)
 
-# Added format="YYYY-MM-DD" to fix the typing bug
+# Fixed date picking format bug
 start_date = st.sidebar.date_input("Start Date", value=five_years_ago, format="YYYY-MM-DD")
 end_date = st.sidebar.date_input("End Date", value=today, format="YYYY-MM-DD")
 epochs = st.sidebar.slider("Training Epochs", min_value=5, max_value=30, value=10)
@@ -48,8 +48,17 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
         ticker_obj = yf.Ticker(ticker, session=session)
         data = yf.download(ticker, start=start_date, end=end_date, multi_level_index=False, session=session)
         
-        info = ticker_obj.info if hasattr(ticker_obj, 'info') else {}
-        news_items = ticker_obj.news if hasattr(ticker_obj, 'news') else []
+        # Safely fetch fundamentals - catch any Yahoo rate limit errors gracefully
+        try:
+            info = ticker_obj.info if ticker_obj.info else {}
+        except Exception:
+            info = {}
+            
+        # Safely fetch news - catch any Yahoo rate limit errors gracefully
+        try:
+            news_items = ticker_obj.news if ticker_obj.news else []
+        except Exception:
+            news_items = []
 
     # ==========================================
     # Safety Check: Minimum Data Required
@@ -126,6 +135,8 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
 
         with col_s2:
             with st.expander("View Recent Headlines & NLP Scores"):
+                if not headlines:
+                    st.write("No recent news headlines available.")
                 for title, score, url in headlines:
                     if url:
                         st.markdown(f"- [{title}]({url}) `[Score: {score:+.2f}]`")
@@ -265,15 +276,20 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
             st.markdown("### 🏢 Fundamentals")
             st.write(f"- **Name:** {info.get('longName', ticker)}")
             st.write(f"- **Sector:** {info.get('sector', 'N/A')}")
-            st.write(f"- **Market Cap:** ${info.get('marketCap', 0):,}")
+            
+            # Format Market Cap to avoid missing data errors
+            market_cap = info.get('marketCap')
+            market_cap_str = f"${market_cap:,}" if isinstance(market_cap, (int, float)) else "N/A"
+            st.write(f"- **Market Cap:** {market_cap_str}")
+            
             st.write(f"- **Trailing P/E Ratio:** {info.get('trailingPE', 'N/A')}")
 
         with rep_col2:
             st.markdown("### 🎯 Signal Breakdown")
-            st.write(f"- **LSTM Forecast:** ${pred_next_usd:.2f} $\\rightarrow$ **{lstm_signal}**")
-            st.write(f"- **50-Day SMA:** ${current_sma:.2f} $\\rightarrow$ **{sma_signal}**")
-            st.write(f"- **14-Day RSI:** {current_rsi:.2f} $\\rightarrow$ **{rsi_signal}**")
-            st.write(f"- **News Sentiment:** {avg_sentiment:+.2f} $\\rightarrow$ **{'Bullish' if avg_sentiment >= 0.05 else 'Bearish' if avg_sentiment <= -0.05 else 'Neutral'}**")
+            st.write(f"- **LSTM Forecast:** ${pred_next_usd:.2f} --> **{lstm_signal}**")
+            st.write(f"- **50-Day SMA:** ${current_sma:.2f} --> **{sma_signal}**")
+            st.write(f"- **14-Day RSI:** {current_rsi:.2f} --> **{rsi_signal}**")
+            st.write(f"- **News Sentiment:** {avg_sentiment:+.2f} --> **{'Bullish' if avg_sentiment >= 0.05 else 'Bearish' if avg_sentiment <= -0.05 else 'Neutral'}**")
             st.markdown(f"#### **Consensus Signal:** {consensus}")
 
         # ==========================================
@@ -295,7 +311,7 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
             "1. COMPANY OVERVIEW",
             f"   - Name: {info.get('longName', ticker)}",
             f"   - Sector: {info.get('sector', 'N/A')}",
-            f"   - Market Cap: ${info.get('marketCap', 0):,}",
+            f"   - Market Cap: {market_cap_str}",
             "",
             "2. QUANTITATIVE FORECAST (LSTM MODEL)",
             f"   - Last Recorded Close: ${last_actual_price:.2f}",
@@ -316,7 +332,9 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
 
         pdf.set_font("Arial", size=12)
         for line in report_lines:
-            pdf.cell(200, 7, txt=line, ln=True)
+            # We use encode/decode to safely drop any tricky Unicode characters (like emojis) that FPDF doesn't like
+            safe_line = line.encode('latin-1', 'replace').decode('latin-1')
+            pdf.cell(200, 7, txt=safe_line, ln=True)
 
         pdf_filename = "report.pdf"
         pdf.output(pdf_filename)
