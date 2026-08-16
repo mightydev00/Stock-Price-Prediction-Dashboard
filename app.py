@@ -10,6 +10,19 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from fpdf import FPDF
 import os
+from requests import Session
+from requests_cache import CacheMixin, SQLiteCache
+from requests_ratelimiter import LimiterMixin, MemoryRateLimiter
+
+# Setup safe session with rate-limiting & caching to prevent Yahoo Finance 429 RateLimitError
+class CachedSession(CacheMixin, LimiterMixin, Session):
+    pass
+
+session = CachedSession(
+    cache=SQLiteCache('.cache.sqlite'),
+    limiter=MemoryRateLimiter(per_second=2)
+)
+session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 st.set_page_config(page_title="Stock Predictor & Intelligence Report", layout="wide")
 
@@ -26,11 +39,11 @@ epochs = st.sidebar.slider("Training Epochs", min_value=5, max_value=30, value=1
 if st.sidebar.button("Run Full Analysis & Generate Report"):
     
     # ==========================================
-    # 1. Fetch Price Data, Fundamentals & News
+    # 1. Fetch Price Data, Fundamentals & News (with Safe Session)
     # ==========================================
     with st.spinner(f"Fetching market data, fundamentals, and news for {ticker}..."):
-        ticker_obj = yf.Ticker(ticker)
-        data = yf.download(ticker, start=start_date, end=end_date, multi_level_index=False)
+        ticker_obj = yf.Ticker(ticker, session=session)
+        data = yf.download(ticker, start=start_date, end=end_date, multi_level_index=False, session=session)
         
         info = ticker_obj.info if hasattr(ticker_obj, 'info') else {}
         news_items = ticker_obj.news if hasattr(ticker_obj, 'news') else []
@@ -39,7 +52,7 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
         st.error("No historical data found. Please verify the ticker symbol and date range.")
     else:
         # ==========================================
-        # 1.5 Interactive Historical Candlestick Chart
+        # 1.5 Interactive Historical Candlestick Chart (Smooth Zoom)
         # ==========================================
         st.subheader(f"📊 Historical Price Action ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})")
         
@@ -56,19 +69,11 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
             template="plotly_dark", 
             margin=dict(l=0, r=0, t=30, b=0),
             height=450,
-            dragmode="zoom", # Enables box zooming
+            dragmode="zoom"
         )
+        fig_candle.update_xaxes(rangeslider_visible=False, fixedrange=False)
+        fig_candle.update_yaxes(fixedrange=False)
         
-        # Configure axes for smooth horizontal (time) and vertical (price) interaction
-        fig_candle.update_xaxes(
-            rangeslider_visible=False,
-            fixedrange=False, # Allows horizontal zooming/panning
-        )
-        fig_candle.update_yaxes(
-            fixedrange=False, # Allows vertical price zooming
-        )
-        
-        # Display with interactive toolbar configuration
         st.plotly_chart(fig_candle, use_container_width=True, config={'scrollZoom': True})
         st.divider()
 
@@ -274,7 +279,6 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
         
         pdf.ln(5)
         
-        # Embed prediction chart image into PDF
         pdf.image(chart_filename, x=10, w=190)
         pdf.ln(5)
 
