@@ -8,3 +8,4 @@ scikit-learn
 tensorflow
 vaderSentiment
 fpdf
+curl-cffi
