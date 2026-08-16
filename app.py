@@ -10,19 +10,16 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from fpdf import FPDF
 import os
-from requests import Session
-from requests_cache import CacheMixin
-from requests_ratelimiter import LimiterMixin
+import requests
 
-# Combine caching and rate-limiting into a single session
-class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
-    pass
-
-session = CachedLimiterSession(
-    cache_name='yfinance.cache',
-    per_second=2 # Limits requests to avoid 429 errors from Yahoo Finance
-)
-session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+# ==========================================
+# Session Setup (Bypass Yahoo Finance 429 Error)
+# ==========================================
+# Create a standard session and set a browser User-Agent 
+session = requests.Session()
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+})
 
 st.set_page_config(page_title="Stock Predictor & Intelligence Report", layout="wide")
 
@@ -39,7 +36,7 @@ epochs = st.sidebar.slider("Training Epochs", min_value=5, max_value=30, value=1
 if st.sidebar.button("Run Full Analysis & Generate Report"):
     
     # ==========================================
-    # 1. Fetch Price Data, Fundamentals & News (with Safe Session)
+    # 1. Fetch Price Data, Fundamentals & News
     # ==========================================
     with st.spinner(f"Fetching market data, fundamentals, and news for {ticker}..."):
         ticker_obj = yf.Ticker(ticker, session=session)
@@ -52,7 +49,7 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
         st.error("No historical data found. Please verify the ticker symbol and date range.")
     else:
         # ==========================================
-        # 1.5 Interactive Historical Candlestick Chart (Smooth Zoom)
+        # 1.5 Interactive Historical Candlestick Chart
         # ==========================================
         st.subheader(f"📊 Historical Price Action ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})")
         
