@@ -11,6 +11,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from fpdf import FPDF
 import os
 import requests
+import datetime  # Added for dynamic dates
 
 # ==========================================
 # Session Setup (Bypass Yahoo Finance 429 Error)
@@ -26,11 +27,19 @@ st.set_page_config(page_title="Stock Predictor & Intelligence Report", layout="w
 st.title("📈 Stock Price Predictor & Intelligence Dashboard")
 st.write("Combines LSTM deep learning, technical indicators, news sentiment, interactive charts, and automated PDF reporting.")
 
-# Sidebar Configuration
+# ==========================================
+# Sidebar Configuration & Dynamic Dates
+# ==========================================
 st.sidebar.header("Configuration")
 ticker = st.sidebar.text_input("Stock Ticker", value="AAPL").upper()
-start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("End Date", pd.to_datetime("today"))
+
+# Dynamically calculate today and 5 years ago
+today = datetime.date.today()
+five_years_ago = today - datetime.timedelta(days=5 * 365)
+
+# Added format="YYYY-MM-DD" to fix the typing bug
+start_date = st.sidebar.date_input("Start Date", value=five_years_ago, format="YYYY-MM-DD")
+end_date = st.sidebar.date_input("End Date", value=today, format="YYYY-MM-DD")
 epochs = st.sidebar.slider("Training Epochs", min_value=5, max_value=30, value=10)
 
 if st.sidebar.button("Run Full Analysis & Generate Report"):
@@ -45,8 +54,14 @@ if st.sidebar.button("Run Full Analysis & Generate Report"):
         info = ticker_obj.info if hasattr(ticker_obj, 'info') else {}
         news_items = ticker_obj.news if hasattr(ticker_obj, 'news') else []
 
+    # ==========================================
+    # Safety Check: Minimum Data Required
+    # ==========================================
     if data.empty:
         st.error("No historical data found. Please verify the ticker symbol and date range.")
+    elif len(data) < 150:
+        st.warning(f"⚠️ {ticker} only has {len(data)} days of trading history available in this range.")
+        st.error("Our deep learning model requires a minimum of 150 trading days to calculate technical indicators (50-day SMA) and generate 60-day training sequences. Please select a company with a longer public history.")
     else:
         # ==========================================
         # 1.5 Interactive Historical Candlestick Chart
