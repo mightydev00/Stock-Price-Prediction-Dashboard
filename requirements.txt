@@ -8,5 +8,3 @@ scikit-learn
 tensorflow
 vaderSentiment
 fpdf
-requests-cache
-requests-ratelimiter
